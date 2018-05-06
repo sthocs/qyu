@@ -1,0 +1,15 @@
+{
+  "name": "qyu",
+  "version": "0.1.0",
+  "description": "A rate limited queue",
+  "main": "app.js",
+  "scripts": {
+    "test": ""
+  },
+  "keywords": [
+    "events",
+    "queue"
+  ],
+  "author": "sbellone",
+  "license": "ISC"
+}
