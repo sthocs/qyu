@@ -1,14 +1,15 @@
 {
   "name": "qyu",
   "version": "0.1.0",
-  "description": "A rate limited queue",
+  "description": "A rate-limited queue to execute async jobs",
   "main": "app.js",
   "scripts": {
     "test": "mocha"
   },
   "keywords": [
-    "events",
-    "queue"
+    "queue",
+    "jobs",
+    "events"
   ],
   "author": "sbellone",
   "license": "ISC",
