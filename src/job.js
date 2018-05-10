@@ -1,5 +1,13 @@
 
+/**
+ * Class which will carry a job and its properties
+ */
 class Job {
+  /**
+   * @param job An async function
+   * @param priority The priority of the job
+   * @param jobId The id of the job
+   */
   constructor(job, priority, jobId) {
     this.job = job;
     this.priority = priority;

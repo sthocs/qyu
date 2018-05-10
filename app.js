@@ -59,7 +59,7 @@ class Qyu {
    *                 If missing or invalid, the priority will be set to 5
    */
   push(job, priority) {
-    if (!priority || priority < 1 || priority > 10) {
+    if (!priority || isNaN(priority) || priority < 1 || priority > 10) {
       priority = 5;
     }
     let id = crypto.randomBytes(16).toString("hex");
@@ -79,9 +79,13 @@ class Qyu {
    */
   pause() {
     this.isRunning = false;
-    return new Promise(resolve => {
-      this.deferredPause = resolve;
+    let res = new Promise(resolve => {
+      this._deferredPause = resolve;
     });
+    if (this.nbJobsRunning == 0) {
+      this._stopStatsEmitter();
+    }
+    return res;
   }
 
   /**
@@ -92,7 +96,8 @@ class Qyu {
   start() {
     this.isRunning = true;
     let res = new Promise(resolve => {
-      this.deferredStart = resolve;
+      // Keep the promise resolver in memory, to fulfill it when the first job is processed.
+      this._deferredStart = resolve;
     });
     this._startStatsEmitter();
     this._processNextJobs();
@@ -115,38 +120,46 @@ class Qyu {
 
   _processNextJobs() {
     while (this.isRunning && this.nbJobsRunning < this.rateLimit) {
-      let i = 1;
-      for (i; i <= 10; ++i) {
-        let nextJobId = this.jobsQueues[i].shift();
-        if (nextJobId) {
-          ++this.nbJobsRunning;
-          ++this.nbJobsProcessedSinceLastCheck;
-          let nextJob = this.jobs[nextJobId];
-          nextJob.execute().then(res => {
-            this.eventEmitter.emit('done', nextJobId, res);
-            this._handleJobFinished(nextJob);
-          })
-          .catch(err => {
-            this.eventEmitter.emit('error', nextJobId, err);
-            this._handleJobFinished(nextJob);
-          });
-          if (this.deferredStart) {
-            // First job has been started, fulfill the promise
-            this.deferredStart();
-            this.deferredStart = undefined;
-          }
-          break;
+      let nextJob = this._getNextJob();
+      if (nextJob) {
+        ++this.nbJobsRunning;
+        ++this.nbJobsProcessedSinceLastCheck;
+        this._executeJob(nextJob);
+        if (this._deferredStart) {
+          // First job has been started, fulfill the promise
+          this._deferredStart();
+          this._deferredStart = undefined;
         }
       }
-      if (i == 11) { // All queues are empty, no more jobs
+      else {
         if (this.nbJobsRunning == 0) {
           this.eventEmitter.emit('drain');
         }
-        // Quit the loop, the method will be called again when existing jobs
+        // Quit the loop, the method will be called again when running jobs
         // are finished or when new jobs are added.
         break;
       }
     }
+  }
+
+  _getNextJob() {
+    for (let i = 1; i <= 10; ++i) {
+      let nextJobId = this.jobsQueues[i].shift();
+      if (nextJobId) {
+        return this.jobs[nextJobId];
+      }
+    }
+  }
+
+  _executeJob(job) {
+    return job.execute().then(res => {
+      this.eventEmitter.emit('done', job.jobId, res);
+      this._handleJobFinished(job);
+    })
+    .catch(err => {
+      this.eventEmitter.emit('error', job.jobId, err);
+      this._handleJobFinished(job);
+    });
   }
 
   _handleJobFinished(job) {
@@ -161,7 +174,6 @@ class Qyu {
     else if (this.nbJobsRunning == 0) {
       // The qyu is paused and all jobs have now finished
       this._stopStatsEmitter();
-      this.deferredPause();
     }
   }
 
@@ -175,5 +187,6 @@ class Qyu {
 
   _stopStatsEmitter() {
     clearInterval(this.statsEmitter);
+    this._deferredPause();
   }
 }
