@@ -123,7 +123,6 @@ class Qyu {
       let nextJob = this._getNextJob();
       if (nextJob) {
         ++this.nbJobsRunning;
-        ++this.nbJobsProcessedSinceLastCheck;
         this._executeJob(nextJob);
         if (this._deferredStart) {
           // First job has been started, fulfill the promise
@@ -163,6 +162,7 @@ class Qyu {
   }
 
   _handleJobFinished(job) {
+    ++this.nbJobsProcessedSinceLastCheck;
     --this.nbJobsRunning;
     if (job.promised) {
       // The job is executed and the result has been promised, we can remove it from memory
@@ -178,15 +178,23 @@ class Qyu {
   }
 
   _startStatsEmitter() {
-    this.statsEmitter = setInterval(() => {
-      let jobsPerSecond = this.nbJobsProcessedSinceLastCheck * 1000 / this.statsInterval;
-      this.eventEmitter.emit('stats', jobsPerSecond);
-      this.nbJobsProcessedSinceLastCheck = 0;
-    }, this.statsInterval);
+    if (this.statsEmitterId) {
+      return;
+    }
+    this.statsEmitterId = setInterval(() => this._emitStats(), this.statsInterval);
+  }
+
+  _emitStats() {
+    // TODO make the stat on a wider interval
+    let jobsPerSecond = this.nbJobsProcessedSinceLastCheck * 1000 / this.statsInterval;
+    this.eventEmitter.emit('stats', jobsPerSecond);
+    this.nbJobsProcessedSinceLastCheck = 0;
   }
 
   _stopStatsEmitter() {
-    clearInterval(this.statsEmitter);
+    clearInterval(this.statsEmitterId);
+    this.statsEmitterId = null;
+    this._emitStats(); // Emit stats a last time
     this._deferredPause();
   }
 }

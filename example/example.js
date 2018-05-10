@@ -59,8 +59,8 @@ q.on('stats', ( nbJobsPerSecond ) => {
   console.log('\npausing...\n')
   q.pause().then(() => console.log('\npaused'));
   await wait(5000);
-  console.log('starting!')
-  q.start().then(() => console.log('started'));
+  console.log('restarting!')
+  q.start().then(() => console.log('restarted\n'));
 })();
 
 

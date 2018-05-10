@@ -159,7 +159,6 @@ describe('Qyu', function() {
       q._processNextJobs();
 
       q.nbJobsRunning.should.equal(1);
-      q.nbJobsProcessedSinceLastCheck.should.equal(1);
       executeJobFake.calledWith(nextJob).should.be.true;
       promiseResolverFake.called.should.be.true;
       assert.equal(q._deferredStart, undefined);
@@ -263,13 +262,15 @@ describe('Qyu', function() {
   });
 
   describe('#_handleJobFinished', function() {
-    it('should decrease nb jobs running', function() {
+    it('should decrease nb jobs running and increase stats', function() {
       const q = qyu();
       q.nbJobsRunning = 3;
+      q.nbJobsProcessedSinceLastCheck = 4;
 
       q._handleJobFinished(new Job());
 
       assert.equal(q.nbJobsRunning, 2);
+      assert.equal(q.nbJobsProcessedSinceLastCheck, 5);
     });
 
     it('should delete job if it has been promised', function() {
@@ -313,6 +314,37 @@ describe('Qyu', function() {
       q.nbJobsRunning = 1;
       q._handleJobFinished(new Job());
       stopStatsEmitterFake.called.should.be.true;
+    });
+  });
+
+  describe('#_emitStats', function() {
+    it('should emit the correct stats and reset the counter', function() {
+      const q = qyu();
+      q.statsInterval = 2500;
+      q.nbJobsProcessedSinceLastCheck = 5;
+
+      let spy = sinon.spy();
+      q.eventEmitter.on('stats', spy);
+
+      q._emitStats();
+
+      assert.equal(spy.firstCall.args[0], 2);
+      assert.equal(q.nbJobsProcessedSinceLastCheck, 0);
+    });
+  });
+
+  describe('#_stopStatsEmitter', function() {
+    it('should emit stats a last time and resolve the promised pause', function() {
+      const q = qyu();
+      let emitStatsFake = sinon.fake();
+      let deferredPauseFake = sinon.fake();
+      q._emitStats = emitStatsFake;
+      q._deferredPause = deferredPauseFake;
+
+      q._stopStatsEmitter();
+
+      emitStatsFake.called.should.be.true;
+      deferredPauseFake.called.should.be.true;
     });
   });
 });
